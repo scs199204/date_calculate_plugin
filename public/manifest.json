@@ -1,0 +1,28 @@
+{
+  "manifest_version": 1,
+  "version": "0.0.1",
+  "type": "APP",
+  "desktop": {
+    "js": ["js/desktop.js"],
+    "css": ["css/customize.css"]
+  },
+  "icon": "image/icon.png",
+  "config": {
+    "html": "html/config.html",
+    "js": ["js/kintone-config-helper.js", "js/config.js"],
+    "css": [],
+    "required_params": ["recalculation"]
+  },
+  "name": {
+    "ja": "日付算出プラグイン",
+    "en": "date calculate Plug-in"
+  },
+  "description": {
+    "ja": "入力した日付から日付算出するプラグイン",
+    "en": "Date Calculate Plug-in"
+  },
+  "homepage_url": {
+    "ja": "https://cybozu.dev/ja/kintone/tips/development/customize/file/steps-upload-files/",
+    "en": "https://cybozu.dev/ja/kintone/tips/development/customize/file/steps-upload-files/"
+  }
+}
