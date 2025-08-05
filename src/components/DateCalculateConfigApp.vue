@@ -18,9 +18,9 @@
 
     <div class="setting-section">
       <h2 class="section-title">日付算出一覧</h2>
-      <div v-if="subtableError" class="error-message">日付フィールドと結果フィールドは同じサブテーブルを選択してください。</div>
-      <div v-if="duplicateError" class="error-message">フィールドが重複しています。</div>
-      <div v-if="sameFieldError" class="error-message">同じフィールドを日付フィールド、結果フィールド両方で使用しています。</div>
+      <div v-if="hasError" class="error-message">
+        <p>{{ errorMessage }}</p>
+      </div>
 
       <table class="data-table">
         <thead>
@@ -36,20 +36,17 @@
         <tbody>
           <tr v-for="(calculateParameter, index) in calculateParameters" :key="calculateParameter.id">
             <td>
-              <select v-model="calculateParameter.targetField" :class="{ 'input-error': sameFieldError || duplicateError }">
-                <option v-for="itemTargetField in optionTargetField" :value="itemTargetField.id" :key="itemTargetField.id">
+              <select
+                v-model="calculateParameter.targetField"
+                :class="{ 'input-error': isSubtableError(calculateParameter) || isDuplicateError(calculateParameter) || isSameFieldError(calculateParameter) }"
+              >
+                <option v-for="itemTargetField in props.optionTargetField" :value="itemTargetField.id" :key="itemTargetField.id">
                   {{ itemTargetField.name }}
                 </option>
               </select>
             </td>
             <td>
-              <input
-                :value="calculateParameter.addMonthCount"
-                @change="addMonthCountChange(index, $event)"
-                type="text"
-                class="text-input month-input"
-                :class="{ 'input-error': sameFieldError || duplicateError }"
-              />
+              <input v-model.number="calculateParameter.addMonthCount" type="number" class="text-input month-input" :class="{ 'input-error': !isMonthCountValid(calculateParameter.addMonthCount) }" />
             </td>
             <td>
               <select v-model="calculateParameter.calculateDay">
@@ -66,8 +63,11 @@
               </select>
             </td>
             <td>
-              <select v-model="calculateParameter.outputField" :class="{ 'input-error': sameFieldError || duplicateError || subtableError }">
-                <option v-for="itemTargetField in optionTargetField" :value="itemTargetField.id" :key="itemTargetField.id">
+              <select
+                v-model="calculateParameter.outputField"
+                :class="{ 'input-error': isSubtableError(calculateParameter) || isDuplicateError(calculateParameter) || isSameFieldError(calculateParameter) }"
+              >
+                <option v-for="itemTargetField in props.optionTargetField" :value="itemTargetField.id" :key="itemTargetField.id">
                   {{ itemTargetField.name }}
                 </option>
               </select>
@@ -89,9 +89,7 @@
 </template>
 
 <script setup>
-// JavaScriptコードは前回と同じなので割愛します。
-// Vue 3のComposition APIを使用しており、変更の必要はありません。
-import { ref, nextTick } from 'vue';
+import { ref, computed } from 'vue';
 
 const props = defineProps({
   initialConfig: Object,
@@ -114,51 +112,89 @@ const optionNotDay = ref([
 
 const recalculation = ref(props.initialConfig.recalculation);
 const calculateParameters = ref(props.initialConfig.calculateParameters);
-const optionTargetField = ref(props.optionTargetField);
 
-const subtableError = ref(false);
-const duplicateError = ref(false);
-const sameFieldError = ref(false);
+const hasError = ref(false);
+const errorMessage = ref('');
+
+// 月数入力のバリデーション
+const isMonthCountValid = (value) => {
+  return value === '' || (Number.isInteger(Number(value)) && Number(value) >= -240 && Number(value) <= 240);
+};
+
+// サブテーブルのバリデーション
+const isSubtableError = (param) => {
+  if (param.targetField === '' || param.outputField === '') return false;
+  const inputFieldArray = param.targetField.split(',');
+  const outputFieldArray = param.outputField.split(',');
+  return inputFieldArray[1] !== outputFieldArray[1];
+};
+
+// フィールド重複のバリデーション
+const isDuplicateError = (param) => {
+  const allOutputFields = calculateParameters.value.map((p) => p.outputField).filter((f) => f !== '');
+  const count = allOutputFields.filter((f) => f === param.outputField).length;
+  return count > 1;
+};
+
+// 同じフィールドのバリデーション
+const isSameFieldError = (param) => {
+  return param.targetField === param.outputField && param.targetField !== '';
+};
+
+// 全体のエラーチェック
+const validate = () => {
+  errorMessage.value = '';
+  hasError.value = false;
+
+  // 月数チェック
+  for (const item of calculateParameters.value) {
+    if (!isMonthCountValid(item.addMonthCount)) {
+      errorMessage.value = '月数は-240～240の整数で入力してください。';
+      hasError.value = true;
+      return false;
+    }
+  }
+
+  const outputFields = calculateParameters.value.map((p) => p.outputField).filter((field) => field !== '');
+  const uniqueOutputFields = new Set(outputFields);
+
+  if (outputFields.length !== uniqueOutputFields.size) {
+    const duplicatedFields = [...new Set(outputFields.filter((field, index, self) => self.indexOf(field) !== index))];
+    const duplicatedFieldNames = duplicatedFields.map((fieldCode) => {
+      const field = props.optionTargetField.find((f) => f.id === fieldCode);
+      return field ? field.name : fieldCode;
+    });
+    errorMessage.value = `結果フィールドが重複しています：${duplicatedFieldNames.join(', ')}`;
+    hasError.value = true;
+    return false;
+  }
+
+  for (const item of calculateParameters.value) {
+    if (isSubtableError(item)) {
+      errorMessage.value = '日付フィールドと結果フィールドは同じサブテーブルを選択してください。';
+      hasError.value = true;
+      return false;
+    }
+    if (isSameFieldError(item)) {
+      errorMessage.value = '日付フィールドと結果フィールドに同じフィールドは指定できません。';
+      hasError.value = true;
+      return false;
+    }
+  }
+
+  return true;
+};
 
 const register = () => {
+  if (!validate()) {
+    return;
+  }
+
   try {
-    subtableError.value = false;
-    duplicateError.value = false;
-    sameFieldError.value = false;
-
-    for (const item of calculateParameters.value) {
-      const inputFieldArray = item.targetField.split(',');
-      const outputFieldArray = item.outputField.split(',');
-
-      if (!(item.targetField === '' && item.outputField === '')) {
-        if (inputFieldArray.length !== outputFieldArray.length || inputFieldArray[1] !== outputFieldArray[1]) {
-          subtableError.value = true;
-        }
-      }
-
-      if (item.targetField === item.outputField && item.targetField !== '') {
-        sameFieldError.value = true;
-      }
-    }
-
-    const outputFields = calculateParameters.value.map((p) => p.outputField).filter((field) => field !== '');
-    const uniqueOutputFields = new Set(outputFields);
-    if (outputFields.length !== uniqueOutputFields.size) {
-      duplicateError.value = true;
-    }
-
-    if (subtableError.value || duplicateError.value || sameFieldError.value) {
-      throw new Error('入力エラー');
-    }
-
     const param = {
       recalculation: recalculation.value,
-      calculateParameters: calculateParameters.value,
+      calculateParameters: JSON.stringify(calculateParameters.value),
     };
-    for (let i = 0; i < calculateParameters.value.length; i++) {
-      calculateParameters.value[i].id = i + 1;
-    }
-    param.calculateParameters = JSON.stringify(calculateParameters.value);
 
     kintone.plugin.app.setConfig(param, () => {
       alert('プラグインの設定が保存されました！アプリを更新してください！');
@@ -166,6 +202,8 @@ const register = () => {
     });
   } catch (e) {
     console.error('name: ' + e.name + ' message: ' + e.message);
+    hasError.value = true;
+    errorMessage.value = '設定の保存中にエラーが発生しました。';
   }
 };
 
@@ -174,33 +212,13 @@ const cancel = () => {
 };
 
 const addItem = (index) => {
-  const maxId = calculateParameters.value.reduce((max, p) => Math.max(max, p.id), 0);
-  calculateParameters.value.splice(index + 1, 0, { id: maxId + 1, targetField: '', addMonthCount: 0, calculateDay: '月末日', notDay: '前日', outputField: '' });
+  calculateParameters.value.splice(index + 1, 0, { id: Date.now(), targetField: '', addMonthCount: 0, calculateDay: '月末日', notDay: '前日', outputField: '' });
 };
 
 const removeItem = (index) => {
   calculateParameters.value.splice(index, 1);
   if (calculateParameters.value.length === 0) {
-    calculateParameters.value.push({ id: 1, targetField: '', addMonthCount: 0, calculateDay: '月末日', notDay: '前日', outputField: '' });
-  }
-};
-
-const addMonthCountChange = (index, event) => {
-  try {
-    const num = Number(event.target.value);
-    if (event.target.value === '' || (Number.isInteger(num) && num >= -240 && num <= 240)) {
-      calculateParameters.value[index].addMonthCount = event.target.value === '' ? '' : num;
-    } else {
-      const beforeValue = calculateParameters.value[index].addMonthCount;
-      calculateParameters.value[index].addMonthCount = '';
-      nextTick(() => {
-        calculateParameters.value[index].addMonthCount = beforeValue;
-      });
-      alert('月数は-240～240の整数で入力してください。');
-      throw new Error('月数は-240～240の整数で入力してください。');
-    }
-  } catch (e) {
-    console.error(e.message);
+    calculateParameters.value.push({ id: Date.now(), targetField: '', addMonthCount: 0, calculateDay: '月末日', notDay: '前日', outputField: '' });
   }
 };
 </script>
