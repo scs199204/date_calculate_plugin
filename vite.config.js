@@ -8,7 +8,6 @@ export default defineConfig({
   plugins: [vue(), cssInjectedByJsPlugin()],
   build: {
     outDir: 'dist',
-    cssCodeSplit: true,
     rollupOptions: {
       //inputが「キー:値」で指定された場合[name]はキーを参照している
       input: {
@@ -39,7 +38,7 @@ export default defineConfig({
           return 'assets/[name]-[hash].[ext]';
         },
         format: 'umd',
-        name: '[name]Plugin',
+        name: 'dateCalculatePlugin',
       },
     },
     sourcemap: false,
