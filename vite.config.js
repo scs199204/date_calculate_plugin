@@ -37,11 +37,11 @@ export default defineConfig({
           // その他のアセット
           return 'assets/[name]-[hash].[ext]';
         },
-        format: 'umd',
+        format: 'iife',
         name: 'dateCalculatePlugin',
       },
     },
-    sourcemap: false,
+    sourcemap: 'inline',
     emptyOutDir: true,
   },
 });

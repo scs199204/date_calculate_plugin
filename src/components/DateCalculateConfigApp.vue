@@ -40,7 +40,7 @@
                 v-model="calculateParameter.targetField"
                 :class="{ 'input-error': isSubtableError(calculateParameter) || isDuplicateError(calculateParameter) || isSameFieldError(calculateParameter) }"
               >
-                <option v-for="itemTargetField in props.optionTargetField" :value="itemTargetField.id" :key="itemTargetField.id">
+                <option v-for="itemTargetField in optionTargetField" :value="itemTargetField.id" :key="itemTargetField.id">
                   {{ itemTargetField.name }}
                 </option>
               </select>
@@ -67,7 +67,7 @@
                 v-model="calculateParameter.outputField"
                 :class="{ 'input-error': isSubtableError(calculateParameter) || isDuplicateError(calculateParameter) || isSameFieldError(calculateParameter) }"
               >
-                <option v-for="itemTargetField in props.optionTargetField" :value="itemTargetField.id" :key="itemTargetField.id">
+                <option v-for="itemTargetField in optionTargetField" :value="itemTargetField.id" :key="itemTargetField.id">
                   {{ itemTargetField.name }}
                 </option>
               </select>
@@ -89,12 +89,13 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, onMounted } from 'vue';
+import { setDropDown, cancel } from './kintonePluginCommonFunction.js';
 
-const props = defineProps({
-  initialConfig: Object,
-  optionTargetField: Array,
-});
+//config.jsから渡される引数(変数、関数)
+const props = defineProps(['initialConfig']);
+
+const optionTargetField = ref([]);
 
 const optionRecalculation = ref([
   { id: '不要', name: '不要' },
@@ -140,6 +141,18 @@ const isDuplicateError = (param) => {
 const isSameFieldError = (param) => {
   return param.targetField === param.outputField && param.targetField !== '';
 };
+
+// onMountedで初期データを取得
+onMounted(async () => {
+  try {
+    // Dateフィールドの一覧を取得し、ドロップダウン用に変換 (ここで await を使う)
+    const dateFields = await KintoneConfigHelper.getFields(['DATE']); //指定した型のフィールドの一覧を抽出
+    optionTargetField.value = setDropDown(dateFields, true); // フィールド情報をドロップダウン用のデータに変換 (await 完了後に行う)
+  } catch (error) {
+    hasError.value = true;
+    errorMessage.value = error.message;
+  }
+});
 
 // 全体のエラーチェック
 const validate = () => {
@@ -205,10 +218,6 @@ const register = () => {
     hasError.value = true;
     errorMessage.value = '設定の保存中にエラーが発生しました。';
   }
-};
-
-const cancel = () => {
-  window.location.href = '/k/admin/app/' + kintone.app.getId() + '/plugin/';
 };
 
 const addItem = (index) => {

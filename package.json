@@ -13,6 +13,8 @@
     "build:upload": "npm run clean && npm run build && npm run pack && npm run upload"
   },
   "dependencies": {
+    "@kintone/plugin-packer": "^9.0.0",
+    "@kintone/plugin-uploader": "^10.0.0",
     "vue": "^3.5.17"
   },
   "devDependencies": {
